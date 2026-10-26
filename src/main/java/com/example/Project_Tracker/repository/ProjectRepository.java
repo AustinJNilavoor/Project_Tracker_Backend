@@ -1,6 +1,8 @@
 package com.example.Project_Tracker.repository;
 
 import com.example.Project_Tracker.entity.Project;
+import com.example.Project_Tracker.enums.Status;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -15,7 +17,7 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
 
     List<Project> findByMembers_User_Id(String userId);
 
-    List<Project> findByStatus(String status);
+    List<Project> findByStatus(Status status);
 
     List<Project> findByCreatedBy_Id(String userId);
 

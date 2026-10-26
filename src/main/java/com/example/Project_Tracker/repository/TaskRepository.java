@@ -18,4 +18,7 @@ public interface TaskRepository extends JpaRepository<Task, String> {
     List<Task> findByAssignedTo_Id(String userId);
 
     List<Task> findByStatus(TaskStatus status);
+    boolean existsByProject_IdAndAssignedTo_Id(String projectId, String userId);
+// Checks if any task exists for a given milestone ID that is NOT in the COMPLETED status.
+boolean existsByMilestone_IdAndStatusNot(String milestoneId, TaskStatus status);
 }

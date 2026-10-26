@@ -53,7 +53,7 @@ public class Project {
     @JoinColumn(name = "created_by")
     private User createdBy;
 
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL)

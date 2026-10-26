@@ -37,7 +37,7 @@ public class User {
     private Ibu ibu; // The department/IBU they belong to
 
     private final LocalDateTime createdAt = LocalDateTime.now();
-    private final LocalDateTime updatedAt = LocalDateTime.now();
+    private  LocalDateTime updatedAt ;
 
 
 

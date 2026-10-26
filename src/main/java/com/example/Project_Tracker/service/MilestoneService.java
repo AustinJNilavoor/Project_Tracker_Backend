@@ -4,13 +4,21 @@ import com.example.Project_Tracker.dto.MilestoneDto;
 import com.example.Project_Tracker.entity.Milestone;
 import com.example.Project_Tracker.entity.Project;
 import com.example.Project_Tracker.entity.User;
+import com.example.Project_Tracker.enums.ProjectRole;
 import com.example.Project_Tracker.enums.Status;
+import com.example.Project_Tracker.enums.TaskStatus;
+import com.example.Project_Tracker.exceptions.BadRequestException;
+import com.example.Project_Tracker.exceptions.ConflictException;
+import com.example.Project_Tracker.exceptions.ResourceNotFoundException;
+import com.example.Project_Tracker.exceptions.MilestoneCompletionException;
 import com.example.Project_Tracker.repository.MilestoneRepository;
 import com.example.Project_Tracker.repository.ProjectMemberRepository;
 import com.example.Project_Tracker.repository.ProjectRepository;
 import com.example.Project_Tracker.repository.UserRepository;
+import com.example.Project_Tracker.repository.TaskRepository;
 import com.example.Project_Tracker.utils.MapperUtils;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,6 +35,7 @@ public class MilestoneService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
+    private final TaskRepository taskRepository;
     private final MapperUtils mapperUtils;
 
     // ✅ Get all milestones for a project
@@ -36,7 +45,12 @@ public class MilestoneService {
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
-
+    public MilestoneDto getMilestonesById(String milestoneId) {
+        Milestone milestone = milestoneRepository.findById(milestoneId)
+        .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
+        return convertToDto(milestone);
+            
+    }
     // ✅ Create milestone — only Manager or Project Manager allowed
     public MilestoneDto createMilestone(MilestoneDto dto) {
         authorizeProjectAccess(dto.getProjectId());
@@ -45,11 +59,18 @@ public class MilestoneService {
 
         if (dto.getDependsOnId() != null) {
             Milestone dependency = milestoneRepository.findById(dto.getDependsOnId())
-                    .orElseThrow(() -> new RuntimeException("Dependency milestone not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Dependency milestone not found"));
             milestone.setDependsOn(dependency);
+            if (dependency != null && (dto.getStatus() == Status.IN_PROGRESS || dto.getStatus() == Status.COMPLETED)) {
+                if (dependency.getStatus() != Status.COMPLETED) {
+                    throw new ConflictException("Cannot start this milestone until the dependent one is completed");
+                }
+            }
         }
-
-        milestone.setCreatedAt(LocalDateTime.now());
+        if (dto.getEndDate() != null && dto.getStartDate() != null && dto.getEndDate().isBefore(dto.getStartDate())) {
+            throw new BadRequestException("End date cannot be before start date");
+        }
+        // milestone.setCreatedAt(LocalDateTime.now());
         Milestone saved = milestoneRepository.save(milestone);
         return convertToDto(saved);
     }
@@ -57,20 +78,48 @@ public class MilestoneService {
     // ✅ Update milestone — only Manager or Project Manager allowed
     public MilestoneDto updateMilestone(String id, MilestoneDto dto) {
         Milestone existing = milestoneRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Milestone not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Milestone not found"));
 
         // Authorization check using project ID
         authorizeProjectAccess(existing.getProject().getId());
 
-        existing.setName(dto.getName());
-        existing.setDescription(dto.getDescription());
+        // Only update the name if the DTO provided a non-null value
+        if (dto.getName() != null) {
+            existing.setName(dto.getName());
+        }
+
+        // Only update the description if the DTO provided a non-null value
+        if (dto.getDescription() != null) {
+            existing.setDescription(dto.getDescription());
+        }
+
+        // Only update the status if the DTO provided a non-null value
+        if (dto.getStatus() != null) {
+            existing.setStatus(dto.getStatus());
+        }
+boolean incompleteTaskExists = taskRepository.existsByMilestone_IdAndStatusNot(
+        id, 
+        TaskStatus.COMPLETED
+    );
+        // Only update the start date if the DTO provided a non-null value
+    if (dto.getStatus() != null) {
+        
+        // 🚨 NEW VALIDATION: Prevent setting status to COMPLETED if tasks are incomplete
+        if (dto.getStatus() == Status.COMPLETED && incompleteTaskExists) {
+            throw new MilestoneCompletionException("Cannot complete milestone: One or more associated tasks are not completed.");
+        }
+        
         existing.setStatus(dto.getStatus());
-        existing.setStartDate(dto.getStartDate());
-        existing.setEndDate(dto.getEndDate());
+    }
+
+        // Only update the end date if the DTO provided a non-null value
+        if (dto.getEndDate() != null) {
+            existing.setEndDate(dto.getEndDate());
+        }
 
         if (dto.getDependsOnId() != null) {
             Milestone dependency = milestoneRepository.findById(dto.getDependsOnId())
-                    .orElseThrow(() -> new RuntimeException("Dependency milestone not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Dependency milestone not found"));
             existing.setDependsOn(dependency);
         } else {
             existing.setDependsOn(null);
@@ -91,7 +140,7 @@ public class MilestoneService {
     // ✅ Delete milestone — only Manager or Project Manager allowed
     public void deleteMilestone(String id) {
         Milestone milestone = milestoneRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Milestone not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Milestone not found"));
 
         // Authorization check using project ID
         authorizeProjectAccess(milestone.getProject().getId());
@@ -103,12 +152,18 @@ public class MilestoneService {
     private void authorizeProjectAccess(String projectId) {
         User currentUser = userRepository.findByEmail(
                 SecurityContextHolder.getContext().getAuthentication().getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         boolean isProjectManager = projectMemberRepository
-                .existsById_ProjectIdAndUser_IdAndRoleInProject(projectId, currentUser.getId(), "PROJECT_MANAGER");
-
-        if (!currentUser.getRole().equalsIgnoreCase("MANAGER") && !isProjectManager) {
+                .existsById_ProjectIdAndUser_IdAndRoleInProject(projectId, currentUser.getId(),
+                        ProjectRole.valueOf("PROJECT_MANAGER"));
+        boolean isSameIBU = false;
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        if (currentUser.getIbu() != null && project.getIbu() != null) {
+            isSameIBU = currentUser.getIbu().getId().equals(project.getIbu().getId());
+        }
+        if ((!currentUser.getRole().equalsIgnoreCase("MANAGER") || !isSameIBU) && !isProjectManager) {
             throw new AccessDeniedException("You are not authorized to access or modify milestones for this project");
         }
     }
@@ -136,13 +191,13 @@ public class MilestoneService {
 
         if (dto.getProjectId() != null) {
             Project project = projectRepository.findById(dto.getProjectId())
-                    .orElseThrow(() -> new RuntimeException("Project not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
             milestone.setProject(project);
         }
 
         if (dto.getDependsOnId() != null) {
             Milestone dependency = milestoneRepository.findById(dto.getDependsOnId())
-                    .orElseThrow(() -> new RuntimeException("Dependency milestone not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Dependency milestone not found"));
             milestone.setDependsOn(dependency);
         }
 

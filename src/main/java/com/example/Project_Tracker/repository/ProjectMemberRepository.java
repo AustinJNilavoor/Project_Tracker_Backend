@@ -2,6 +2,8 @@ package com.example.Project_Tracker.repository;
 
 import com.example.Project_Tracker.entity.ProjectMember;
 import com.example.Project_Tracker.entity.ProjectMemberId;
+import com.example.Project_Tracker.enums.ProjectRole;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -17,6 +19,7 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Pr
 
     Optional<ProjectMember> findByProject_IdAndUser_Id(String projectId, String userId);
 
-    boolean existsById_ProjectIdAndUser_IdAndRoleInProject(String projectId, String userId, String roleInProject);
+    boolean existsById_ProjectIdAndUser_IdAndRoleInProject(String projectId, String userId, ProjectRole roleInProject);
+    boolean existsById_ProjectIdAndUser_Id(String projectId, String userId);
 
 }

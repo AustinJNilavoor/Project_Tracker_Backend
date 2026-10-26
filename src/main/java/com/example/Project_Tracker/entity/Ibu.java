@@ -26,7 +26,7 @@ public class Ibu {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "ibu", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Project> projects;

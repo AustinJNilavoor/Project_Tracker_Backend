@@ -47,7 +47,7 @@ public class Milestone {
     @JoinColumn(name = "depends_on_milestone_id")
     private Milestone dependsOn;
 
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "milestone", cascade = CascadeType.ALL)
