@@ -53,7 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/projects/**").hasAnyAuthority("MANAGER", "ADMIN")
                         // .requestMatchers(HttpMethod.GET, "/api/projects/**")
                         // .hasAnyAuthority("MANAGER", "ADMIN", "EMPLOYEE")
-                        .requestMatchers("/api/milestones/**").hasAnyAuthority("MANAGER", "EMPLOYEE","ADMIN")
+                        .requestMatchers("/api/milestones/**").hasAnyAuthority("MANAGER", "EMPLOYEE", "ADMIN")
                         .requestMatchers("/api/members/**").hasAnyAuthority("MANAGER", "EMPLOYEE")
 
                         // Employee routes
@@ -85,7 +85,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:5173",
-                "http://127.0.0.1:5173"));
+                "http://127.0.0.1:5173", 
+                "https://austinjnilavoor.github.io/Project_Tracker_Frontend"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
